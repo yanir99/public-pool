@@ -564,30 +564,32 @@ export class StratumV1Client {
 
     }
 
+    // Modify the checkDifficulty method
     private async checkDifficulty() {
         const targetDiff = this.statistics.getSuggestedDifficulty(this.sessionDifficulty);
         if (targetDiff == null) {
             return;
         }
 
-        if (targetDiff != this.sessionDifficulty) {
-            //console.log(`Adjusting ${this.extraNonceAndSessionId} difficulty from ${this.sessionDifficulty} to ${targetDiff}`);
-            this.sessionDifficulty = targetDiff;
+        // Retrieve the minimum difficulty from the configuration
+        const minimumDifficulty = parseFloat(this.configService.get<string>('MINIMUM_DIFFICULTY', '1.0'));
+
+        // Ensure the difficulty does not go below the configured minimum difficulty
+        const adjustedDiff = Math.max(targetDiff, minimumDifficulty);
+
+        if (adjustedDiff != this.sessionDifficulty) {
+            this.sessionDifficulty = adjustedDiff;
 
             const data = JSON.stringify({
                 id: null,
                 method: eResponseMethod.SET_DIFFICULTY,
-                params: [targetDiff]
+                params: [adjustedDiff]
             }) + '\n';
-
 
             await this.socket.write(data);
 
-
-            // we need to clear the jobs so that the difficulty set takes effect. Otherwise the different miner implementations can cause issues
             const jobTemplate = await firstValueFrom(this.stratumV1JobsService.newMiningJob$);
             await this.sendNewMiningJob(jobTemplate);
-
         }
     }
 
